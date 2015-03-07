@@ -51,7 +51,7 @@ func (c *ChallongeClient) buildUrl(route string, v url.Values) string {
 }
 
 /** creates a new tournament */
-func (c *ChallongeClient) CreateTournament(name string, subUrl string, open bool, tournamentType string) *Tournament {
+func (c *ChallongeClient) CreateTournament(name string, subUrl string, open bool, tournamentType string) (*Tournament, error) {
     v := url.Values{}
     v.Add("tournament[name]", name)
     v.Add("tournament[url]", subUrl)
@@ -60,7 +60,10 @@ func (c *ChallongeClient) CreateTournament(name string, subUrl string, open bool
     url := c.buildUrl("tournaments", v)
     response := &APIResponse{}
     c.doPost(url, response)
-    return response.Tournament.withClient(c)
+    if len(response.Errors) > 0 {
+        return nil, fmt.Errorf("unable to create tournament: %q", response.Errors[0])
+    }
+    return response.Tournament.withClient(c), nil
 }
 
 /** returns tournament with the specified id */
@@ -141,8 +144,10 @@ func handleResponse(r *http.Response, v interface{}) {
 func main() {
     c := &ChallongeClient{user: "viking1", version: version, key: "k0PG6IxBQhH8tkpTDlxaUKHLMHRfMy1oycloZgTW"}
     c.Print()
-    response := c.CreateTournament("foobar3", "foobar3", true, "oo").Add("basr")
-    if response.Errors != nil {
-        log.Print(response.Errors)
+    tournament, err := c.CreateTournament("foobar3", "foobar3", true, "oo")
+    if err != nil {
+        log.Fatal("Got error: ", err)
+    } else {
+        tournament.Add("foo")
     }
 }
