@@ -42,6 +42,7 @@ type Tournament struct {
     FullUrl string `json:"full_challonge_url"`
     Participants []ParticipantItem `json:"participants"`
     Matches []MatchItem `json:"matches"`
+    State string `json:"state"`
 
     client *Client
 }
@@ -61,6 +62,7 @@ type MatchItem struct {
 
 type Match struct {
     Id int `json:"id"`
+    Identifier string `json:"identifier"`
     State string `json:"state"`
     PlayerOneId int `json:"player1_id"`
     PlayerTwoId int `json:"player2_id"`
@@ -68,6 +70,7 @@ type Match struct {
 
     PlayerOne *Participant
     PlayerTwo *Participant
+    Winner *Participant
 }
 
 func (c *Client) Print() {
@@ -200,6 +203,7 @@ func (t *Tournament) GetMatch(id int) *Match {
 func (m *Match) ResolveParticipants(t *Tournament) {
     m.PlayerOne = t.GetParticipant(m.PlayerOneId)
     m.PlayerTwo = t.GetParticipant(m.PlayerTwoId)
+    m.Winner = t.GetParticipant(m.WinnerId)
 }
 
 func (t *Tournament) withClient(c *Client) *Tournament {
