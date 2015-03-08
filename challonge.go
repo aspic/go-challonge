@@ -241,7 +241,7 @@ func (c *Client) doDelete(url string, v interface{}) {
 func handleResponse(r *http.Response, v interface{}) {
     body, err := ioutil.ReadAll(r.Body)
 
-    log.Print("got response ", string(body))
+    // log.Print("got response ", string(body))
 
     if err != nil {
         log.Fatal("unable to read response", err)
