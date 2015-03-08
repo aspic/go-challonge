@@ -43,6 +43,7 @@ type Tournament struct {
     Participants []ParticipantItem `json:"participants"`
     Matches []MatchItem `json:"matches"`
     State string `json:"state"`
+    ParticipantsCount int `json:"participants_count"`
 
     client *Client
 }
