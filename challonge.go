@@ -17,7 +17,6 @@ const (
 
 var c ChallongeClient
 
-// Avoids infinite recursion
 type tournament Tournament
 
 type ChallongeClient struct {
@@ -29,6 +28,7 @@ type ChallongeClient struct {
 
 type APIResponse struct {
     Tournament Tournament `json:"tournament"`
+    Participant Participant `json:"participant"`
 
     Errors []string `json:"errors"`
 }
@@ -38,9 +38,13 @@ type Tournament struct {
     Id int `json:"id"`
     Url string `json:"url"`
     FullUrl string `json:"full_challonge_url"`
-    Participants []Participant `json:"participants"`
+    Participants []ParticipantItem `json:"participants"`
 
     client *ChallongeClient
+}
+
+type ParticipantItem struct {
+    Participant Participant `json:"participant"`
 }
 
 type Participant struct {
@@ -92,19 +96,32 @@ func (c *ChallongeClient) GetTournament(id string) (*Tournament, error) {
 }
 
 /** adds participant to tournament */
-func (t *Tournament) Add(name string) *APIResponse {
+func (t *Tournament) AddParticipant(name string) (*Participant, error) {
     v := url.Values{}
     v.Add("participant[name]", name)
 
     url := t.client.buildUrl("tournaments/" + t.Url + "/participants", v)
     response := &APIResponse{}
     c.doPost(url, response)
-    return response
+    if len(response.Errors) > 0 {
+        return nil, fmt.Errorf("unable to add participant: %q", response.Errors[0])
+    }
+    t.Participants = append(t.Participants, ParticipantItem{response.Participant})
+    return &response.Participant, nil
 }
 
 /** removes participant from tournament */
-func (t *Tournament) Remove(name string) error {
-    url := t.client.buildUrl("tournaments/" + t.Url + "/participants/" + strconv.Itoa(t.GetParticipantId(name)), nil)
+func (t *Tournament) RemoveParticipant(name string) error {
+    id := t.GetParticipantId(name)
+    if id == 0 {
+        return fmt.Errorf("participant with name %q not found in tournament", name)
+    }
+    return t.RemoveParticipantById(id)
+}
+
+/** removes participant by id */
+func (t *Tournament) RemoveParticipantById(id int) error {
+    url := t.client.buildUrl("tournaments/" + t.Url + "/participants/" + strconv.Itoa(id), nil)
     response := &APIResponse{}
     c.doDelete(url, response)
     if len(response.Errors) > 0 {
@@ -113,9 +130,10 @@ func (t *Tournament) Remove(name string) error {
     return nil
 }
 
+/** returns a participant id based on name */
 func (t *Tournament) GetParticipantId(name string) int {
-    log.Print("Has: ", t.Participants[0])
-    for _,p := range t.Participants {
+    for _,item := range t.Participants {
+        p := item.Participant
         if p.Name == name {
             return p.Id
         }
@@ -187,9 +205,15 @@ func main() {
     if err != nil {
         log.Fatal("Got error: ", err)
     } else {
-        err = tournament.Remove("foo")
+        p, err := tournament.AddParticipant("foo8")
         if err != nil {
-            log.Fatal("error when deleting ", err)
+            log.Fatal("error when adding user ", err)
+        } else {
+            log.Print("Added user: ", p.Name)
+        }
+        err = tournament.RemoveParticipant("foo8")
+        if err != nil {
+            log.Fatal("error when deleting user ", err)
         }
     }
 }
