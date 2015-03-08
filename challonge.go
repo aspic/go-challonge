@@ -12,16 +12,15 @@ import (
 
 const (
     tournaments = "tournaments"
-    version = "v1"
 
     STATE_OPEN = "open"
 )
 
-var c ChallongeClient
+var c Client
 
 type tournament Tournament
 
-type ChallongeClient struct {
+type Client struct {
     baseUrl string
     key string
     version string
@@ -43,7 +42,7 @@ type Tournament struct {
     Participants []ParticipantItem `json:"participants"`
     Matches []MatchItem `json:"matches"`
 
-    client *ChallongeClient
+    client *Client
 }
 
 type ParticipantItem struct {
@@ -70,11 +69,15 @@ type Match struct {
     PlayerTwo *Participant
 }
 
-func (c *ChallongeClient) Print() {
+func (c *Client) Print() {
     log.Print(c.key)
 }
 
-func (c *ChallongeClient) buildUrl(route string, v url.Values) string {
+func (c *Client) New(user string, key string) *Client {
+    return &Client{user: user, version: "V1", key: key}
+}
+
+func (c *Client) buildUrl(route string, v url.Values) string {
     url := fmt.Sprintf("https://%s:%s@api.challonge.com/%s/%s.json", c.user, c.key, c.version, route)
     if v != nil {
         url += "?" + v.Encode()
@@ -84,7 +87,7 @@ func (c *ChallongeClient) buildUrl(route string, v url.Values) string {
 }
 
 /** creates a new tournament */
-func (c *ChallongeClient) CreateTournament(name string, subUrl string, open bool, tournamentType string) (*Tournament, error) {
+func (c *Client) CreateTournament(name string, subUrl string, open bool, tournamentType string) (*Tournament, error) {
     v := url.Values{}
     v.Add("tournament[name]", name)
     v.Add("tournament[url]", subUrl)
@@ -100,7 +103,7 @@ func (c *ChallongeClient) CreateTournament(name string, subUrl string, open bool
 }
 
 /** returns tournament with the specified id */
-func (c *ChallongeClient) GetTournament(id string) (*Tournament, error) {
+func (c *Client) GetTournament(id string) (*Tournament, error) {
     v := url.Values{}
     v.Add("include_participants", "1")
     v.Add("include_matches", "1")
@@ -198,12 +201,12 @@ func (m *Match) ResolveParticipants(t *Tournament) {
     m.PlayerTwo = t.GetParticipant(m.PlayerTwoId)
 }
 
-func (t *Tournament) withClient(c *ChallongeClient) *Tournament {
+func (t *Tournament) withClient(c *Client) *Tournament {
     t.client = c
     return t
 }
 
-func (c *ChallongeClient) doGet(url string, v interface{}) {
+func (c *Client) doGet(url string, v interface{}) {
     log.Print("gets resource on url ", url)
     resp, err := http.Get(url)
     if err != nil {
@@ -212,7 +215,7 @@ func (c *ChallongeClient) doGet(url string, v interface{}) {
     handleResponse(resp, v)
 }
 
-func (c *ChallongeClient) doPost(url string, v interface{}) {
+func (c *Client) doPost(url string, v interface{}) {
     log.Print("posts resource on url ", url)
     resp, err := http.Post(url, "application/json", nil)
     if err != nil {
@@ -221,7 +224,7 @@ func (c *ChallongeClient) doPost(url string, v interface{}) {
     handleResponse(resp, v)
 }
 
-func (c *ChallongeClient) doDelete(url string, v interface{}) {
+func (c *Client) doDelete(url string, v interface{}) {
     req, err := http.NewRequest("DELETE", url, nil)
     log.Print("deletes resource on url ", url)
     if err != nil {
