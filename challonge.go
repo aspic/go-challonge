@@ -13,6 +13,8 @@ import (
 const (
     tournaments = "tournaments"
     version = "v1"
+
+    STATE_OPEN = "open"
 )
 
 var c ChallongeClient
@@ -39,6 +41,7 @@ type Tournament struct {
     Url string `json:"url"`
     FullUrl string `json:"full_challonge_url"`
     Participants []ParticipantItem `json:"participants"`
+    Matches []MatchItem `json:"matches"`
 
     client *ChallongeClient
 }
@@ -50,6 +53,21 @@ type ParticipantItem struct {
 type Participant struct {
     Id int `json:"id"`
     Name string `json:"name"`
+}
+
+type MatchItem struct {
+    Match Match `json:"match"`
+}
+
+type Match struct {
+    Id int `json:"id"`
+    State string `json:"state"`
+    PlayerOneId int `json:"player1_id"`
+    PlayerTwoId int `json:"player2_id"`
+    WinnerId int `json:"winner_id"`
+
+    PlayerOne *Participant
+    PlayerTwo *Participant
 }
 
 func (c *ChallongeClient) Print() {
@@ -85,6 +103,7 @@ func (c *ChallongeClient) CreateTournament(name string, subUrl string, open bool
 func (c *ChallongeClient) GetTournament(id string) (*Tournament, error) {
     v := url.Values{}
     v.Add("include_participants", "1")
+    v.Add("include_matches", "1")
     url := c.buildUrl("tournaments/" + id, v)
     response := &APIResponse{}
     c.doGet(url, response)
@@ -112,11 +131,11 @@ func (t *Tournament) AddParticipant(name string) (*Participant, error) {
 
 /** removes participant from tournament */
 func (t *Tournament) RemoveParticipant(name string) error {
-    id := t.GetParticipantId(name)
-    if id == 0 {
+    p := t.GetParticipantByName(name)
+    if p.Id == 0 {
         return fmt.Errorf("participant with name %q not found in tournament", name)
     }
-    return t.RemoveParticipantById(id)
+    return t.RemoveParticipantById(p.Id)
 }
 
 /** removes participant by id */
@@ -131,14 +150,52 @@ func (t *Tournament) RemoveParticipantById(id int) error {
 }
 
 /** returns a participant id based on name */
-func (t *Tournament) GetParticipantId(name string) int {
+func (t *Tournament) GetParticipantByName(name string) *Participant {
     for _,item := range t.Participants {
         p := item.Participant
         if p.Name == name {
-            return p.Id
+            return &p
         }
     }
-    return 0
+    return nil
+}
+func (t *Tournament) GetParticipant(id int) *Participant {
+    for _,item := range t.Participants {
+        p := item.Participant
+        if p.Id == id {
+            return &p
+        }
+    }
+    return nil
+}
+
+/** returns all open matches */
+func (t *Tournament) GetOpenMatches() []Match {
+    matches := make([]Match, 0)
+    for _,item := range t.Matches {
+        m := item.Match
+        if m.State == STATE_OPEN {
+            matches = append(matches, m)
+        }
+    }
+    return matches
+}
+
+/** returns match with resolved participants */
+func (t *Tournament) GetMatch(id int) *Match {
+    for _,item := range t.Matches {
+        m := item.Match
+        if m.Id == id {
+            m.ResolveParticipants(t)
+            return &m
+        }
+    }
+    return nil
+}
+
+func (m *Match) ResolveParticipants(t *Tournament) {
+    m.PlayerOne = t.GetParticipant(m.PlayerOneId)
+    m.PlayerTwo = t.GetParticipant(m.PlayerTwoId)
 }
 
 func (t *Tournament) withClient(c *ChallongeClient) *Tournament {
@@ -204,16 +261,6 @@ func main() {
     tournament, err := c.GetTournament("foobar4")
     if err != nil {
         log.Fatal("Got error: ", err)
-    } else {
-        p, err := tournament.AddParticipant("foo8")
-        if err != nil {
-            log.Fatal("error when adding user ", err)
-        } else {
-            log.Print("Added user: ", p.Name)
-        }
-        err = tournament.RemoveParticipant("foo8")
-        if err != nil {
-            log.Fatal("error when deleting user ", err)
-        }
     }
+    log.Print("open matches ", len(tournament.GetOpenMatches()))
 }
