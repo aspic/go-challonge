@@ -73,7 +73,7 @@ func (c *Client) Print() {
     log.Print(c.key)
 }
 
-func (c *Client) New(user string, key string) *Client {
+func New(user string, key string) *Client {
     return &Client{user: user, version: "V1", key: key}
 }
 
