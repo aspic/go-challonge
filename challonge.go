@@ -253,14 +253,3 @@ func (t *Tournament) UnmarshalJSON(b []byte) (err error) {
     }
     return
 }
-
-func main() {
-    c := &ChallongeClient{user: "viking1", version: version, key: "k0PG6IxBQhH8tkpTDlxaUKHLMHRfMy1oycloZgTW"}
-    c.Print()
-    //tournament, err := c.CreateTournament("foobar4", "foobar4", true, "oo")
-    tournament, err := c.GetTournament("foobar4")
-    if err != nil {
-        log.Fatal("Got error: ", err)
-    }
-    log.Print("open matches ", len(tournament.GetOpenMatches()))
-}
