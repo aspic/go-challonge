@@ -11,6 +11,7 @@ import (
 )
 
 const (
+    API_VERSION = "v1"
     tournaments = "tournaments"
 
     STATE_OPEN = "open"
@@ -74,7 +75,7 @@ func (c *Client) Print() {
 }
 
 func New(user string, key string) *Client {
-    return &Client{user: user, version: "V1", key: key}
+    return &Client{user: user, version: API_VERSION, key: key}
 }
 
 func (c *Client) buildUrl(route string, v url.Values) string {
