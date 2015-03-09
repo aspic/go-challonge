@@ -20,7 +20,7 @@ Golang API client for retrieving (and potentially updating) tournaments in  [Cha
 
 ### Tournaments
 
-Retrieve a tournament, including all matches and signed up players:
+Retrieve a tournament, including all matches and participating players:
 
     t, err := client.GetTournament("tournament-name")
     
