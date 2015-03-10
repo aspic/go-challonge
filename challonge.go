@@ -49,9 +49,9 @@ type Tournament struct {
 type Participant struct {
     Id int `json:"id"`
     Name string `json:"name"`
+    Misc string `json:"misc"`
     Wins int
     Losses int
-    Misc string `json:"name"`
 }
 
 type Match struct {
@@ -169,6 +169,7 @@ func (c *Client) GetTournament(name string) (*Tournament, error) {
     if len(response.Errors) > 0 {
         return nil, fmt.Errorf("unable to retrieve tournament: %q", response.Errors[0])
     }
+    log.Print(response.Tournament)
     return &response.Tournament, nil
 }
 
@@ -235,22 +236,22 @@ func (t *Tournament) RemoveParticipantById(id int) error {
 }
 
 /** returns a participant id based on name */
-type cmp func(*Participant) bool
+type cmp func(Participant) bool
 
 func (t *Tournament) GetParticipant(id int) *Participant {
-    return t.getParticipantByCmp(func(p *Participant) bool { return p.Id == id})
+    return t.getParticipantByCmp(func(p Participant) bool { return p.Id == id})
 }
 func (t *Tournament) GetParticipantByName(name string) *Participant {
-    return t.getParticipantByCmp(func(p *Participant) bool { return p.Name == name})
+    return t.getParticipantByCmp(func(p Participant) bool { return p.Name == name })
 }
 func (t *Tournament) GetParticipantByMisc(misc string) *Participant {
-    return t.getParticipantByCmp(func(p *Participant) bool { return p.Misc == misc})
+    return t.getParticipantByCmp(func(p Participant) bool { return p.Misc == misc})
 }
 
 func (t *Tournament) getParticipantByCmp(cmp cmp) *Participant {
     for _,item := range t.Participants {
         p := item.Participant
-        if cmp(&p) {
+        if cmp(p) {
             return &p
         }
     }
