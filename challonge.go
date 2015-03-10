@@ -238,7 +238,7 @@ func (t *Tournament) RemoveParticipantById(id int) error {
 type cmp func(*Participant) bool
 
 func (t *Tournament) GetParticipant(id int) *Participant {
-    return t.getParticipantByCmp(func(p *Participant) bool { return p.Id == id })
+    return t.getParticipantByCmp(func(p *Participant) bool { return p.Id == id})
 }
 func (t *Tournament) GetParticipantByName(name string) *Participant {
     return t.getParticipantByCmp(func(p *Participant) bool { return p.Name == name})
