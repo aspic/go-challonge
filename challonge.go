@@ -17,10 +17,8 @@ const (
     STATE_ALL = "all"
 )
 
+var client *Client
 var debug = false
-
-var c Client
-
 type tournament Tournament
 
 type Client struct {
@@ -46,8 +44,6 @@ type Tournament struct {
     Matches []MatchItem `json:"matches"`
     State string `json:"state"`
     ParticipantsCount int `json:"participants_count"`
-
-    client *Client
 }
 
 type Participant struct {
@@ -88,7 +84,8 @@ func (c *Client) Print() {
 }
 
 func New(user string, key string) *Client {
-    return &Client{user: user, version: API_VERSION, key: key}
+    client := &Client{user: user, version: API_VERSION, key: key}
+    return client
 }
 
 func (c *Client) Debug() {
@@ -126,22 +123,33 @@ func (c *Client) CreateTournament(name string, subUrl string, open bool, tournam
     if len(response.Errors) > 0 {
         return nil, fmt.Errorf("unable to create tournament: %q", response.Errors[0])
     }
-    return response.Tournament.withClient(c), nil
+    return &response.Tournament, nil
 }
 
-/** returns tournament with the specified id */
-func (c *Client) GetTournament(id string) (*Tournament, error) {
+func (t *Tournament) Start() error {
     v := *params(map[string]string{
         "include_participants": "1",
         "include_matches": "1",
     })
-    url := c.buildUrl("tournaments/" + id, v)
+    url := client.buildUrl("tournaments/" + t.Url + "/start", v)
+    response := &APIResponse{}
+    client.doPost(url, response)
+    return nil
+}
+
+/** returns tournament with the specified id */
+func (c *Client) GetTournament(name string) (*Tournament, error) {
+    v := *params(map[string]string{
+        "include_participants": "1",
+        "include_matches": "1",
+    })
+    url := c.buildUrl("tournaments/" + name, v)
     response := &APIResponse{}
     c.doGet(url, response)
     if len(response.Errors) > 0 {
         return nil, fmt.Errorf("unable to retrieve tournament: %q", response.Errors[0])
     }
-    return response.Tournament.withClient(c), nil
+    return &response.Tournament, nil
 }
 
 func (c *Client) getTournaments(state string) (*[]Tournament, error) {
@@ -175,9 +183,9 @@ func (t *Tournament) AddParticipant(name string) (*Participant, error) {
     v := *params(map[string]string{
         "participant[name]": name,
     })
-    url := t.client.buildUrl("tournaments/" + t.Url + "/participants", v)
+    url := client.buildUrl("tournaments/" + t.Url + "/participants", v)
     response := &APIResponse{}
-    c.doPost(url, response)
+    client.doPost(url, response)
     if len(response.Errors) > 0 {
         return nil, fmt.Errorf("unable to add participant: %q", response.Errors[0])
     }
@@ -196,9 +204,9 @@ func (t *Tournament) RemoveParticipant(name string) error {
 
 /** removes participant by id */
 func (t *Tournament) RemoveParticipantById(id int) error {
-    url := t.client.buildUrl("tournaments/" + t.Url + "/participants/" + strconv.Itoa(id), nil)
+    url := client.buildUrl("tournaments/" + t.Url + "/participants/" + strconv.Itoa(id), nil)
     response := &APIResponse{}
-    c.doDelete(url, response)
+    client.doDelete(url, response)
     if len(response.Errors) > 0 {
         return fmt.Errorf("unable to delete participant: %q", response.Errors[0])
     }
@@ -276,12 +284,6 @@ func (m *Match) ResolveParticipants(t *Tournament) {
     m.PlayerOne = t.GetParticipant(m.PlayerOneId)
     m.PlayerTwo = t.GetParticipant(m.PlayerTwoId)
     m.Winner = t.GetParticipant(m.WinnerId)
-}
-
-
-func (t *Tournament) withClient(c *Client) *Tournament {
-    t.client = c
-    return t
 }
 
 func (c *Client) doGet(url string, v interface{}) {
