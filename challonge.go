@@ -235,19 +235,22 @@ func (t *Tournament) RemoveParticipantById(id int) error {
 }
 
 /** returns a participant id based on name */
-func (t *Tournament) GetParticipantByName(name string) *Participant {
-    for _,item := range t.Participants {
-        p := item.Participant
-        if p.Name == name {
-            return &p
-        }
-    }
-    return nil
-}
+type cmp func(*Participant) bool
+
 func (t *Tournament) GetParticipant(id int) *Participant {
+    return t.getParticipantByCmp(func(p *Participant) bool { return p.Id == id })
+}
+func (t *Tournament) GetParticipantByName(name string) *Participant {
+    return t.getParticipantByCmp(func(p *Participant) bool { return p.Name == name})
+}
+func (t *Tournament) GetParticipantByMisc(misc string) *Participant {
+    return t.getParticipantByCmp(func(p *Participant) bool { return p.Misc == misc})
+}
+
+func (t *Tournament) getParticipantByCmp(cmp cmp) *Participant {
     for _,item := range t.Participants {
         p := item.Participant
-        if p.Id == id {
+        if cmp(&p) {
             return &p
         }
     }
