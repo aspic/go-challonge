@@ -215,7 +215,7 @@ func (t *Tournament) AddParticipant(name string) (*Participant, error) {
 /** removes participant from tournament */
 func (t *Tournament) RemoveParticipant(name string) error {
     p := t.GetParticipantByName(name)
-    if p.Id == 0 {
+    if p == nil || p.Id == 0 {
         return fmt.Errorf("participant with name %q not found in tournament", name)
     }
     return t.RemoveParticipantById(p.Id)
