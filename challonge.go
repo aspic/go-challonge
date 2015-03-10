@@ -51,6 +51,7 @@ type Participant struct {
     Name string `json:"name"`
     Wins int
     Losses int
+    Misc string `json:"name"`
 }
 
 type Match struct {
@@ -198,9 +199,10 @@ func (c *Client) GetEndedTournaments() (*[]Tournament, error) {
 }
 
 /** adds participant to tournament */
-func (t *Tournament) AddParticipant(name string) (*Participant, error) {
+func (t *Tournament) AddParticipant(name string, misc string) (*Participant, error) {
     v := *params(map[string]string{
         "participant[name]": name,
+        "participant[misc]": misc,
     })
     url := client.buildUrl("tournaments/" + t.Url + "/participants", v)
     response := &APIResponse{}
