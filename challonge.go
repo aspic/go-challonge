@@ -84,7 +84,7 @@ func (c *Client) Print() {
 }
 
 func New(user string, key string) *Client {
-    client := &Client{user: user, version: API_VERSION, key: key}
+    client = &Client{user: user, version: API_VERSION, key: key}
     return client
 }
 
@@ -109,6 +109,13 @@ func params(p map[string]string) *url.Values {
     return &values
 }
 
+func (r *APIResponse) hasErrors() bool {
+    if debug {
+        log.Printf("response had errors: %q", r.Errors)
+    }
+    return len(r.Errors) > 0
+}
+
 /** creates a new tournament */
 func (c *Client) CreateTournament(name string, subUrl string, open bool, tournamentType string) (*Tournament, error) {
     v := *params(map[string]string{
@@ -119,8 +126,8 @@ func (c *Client) CreateTournament(name string, subUrl string, open bool, tournam
     // v.Add("tournament[tournament_type]", tournamentType)
     url := c.buildUrl("tournaments", v)
     response := &APIResponse{}
-    c.doPost(url, response)
-    if len(response.Errors) > 0 {
+    doPost(url, response)
+    if response.hasErrors() {
         return nil, fmt.Errorf("unable to create tournament: %q", response.Errors[0])
     }
     return &response.Tournament, nil
@@ -133,7 +140,19 @@ func (t *Tournament) Start() error {
     })
     url := client.buildUrl("tournaments/" + t.Url + "/start", v)
     response := &APIResponse{}
-    client.doPost(url, response)
+    doPost(url, response)
+    if response.hasErrors() {
+        return fmt.Errorf("error starting tournament:  %q", response.Errors[0])
+    }
+    tournament := response.Tournament
+    if tournament.State == "underway" {
+        if debug {
+            log.Printf("tournament %q started", tournament.Name)
+        }
+    } else {
+        return fmt.Errorf("tournament has state %q, probably not started", tournament.State)
+    }
+    t = &tournament
     return nil
 }
 
@@ -145,7 +164,7 @@ func (c *Client) GetTournament(name string) (*Tournament, error) {
     })
     url := c.buildUrl("tournaments/" + name, v)
     response := &APIResponse{}
-    c.doGet(url, response)
+    doGet(url, response)
     if len(response.Errors) > 0 {
         return nil, fmt.Errorf("unable to retrieve tournament: %q", response.Errors[0])
     }
@@ -158,7 +177,7 @@ func (c *Client) getTournaments(state string) (*[]Tournament, error) {
     })
     url := c.buildUrl("tournaments", v)
     items := make([]TournamentItem, 0)
-    c.doGet(url, &items)
+    doGet(url, &items)
     if len(items) == 0 {
         return nil, fmt.Errorf("unable to retrieve tournaments")
     }
@@ -185,7 +204,7 @@ func (t *Tournament) AddParticipant(name string) (*Participant, error) {
     })
     url := client.buildUrl("tournaments/" + t.Url + "/participants", v)
     response := &APIResponse{}
-    client.doPost(url, response)
+    doPost(url, response)
     if len(response.Errors) > 0 {
         return nil, fmt.Errorf("unable to add participant: %q", response.Errors[0])
     }
@@ -206,7 +225,7 @@ func (t *Tournament) RemoveParticipant(name string) error {
 func (t *Tournament) RemoveParticipantById(id int) error {
     url := client.buildUrl("tournaments/" + t.Url + "/participants/" + strconv.Itoa(id), nil)
     response := &APIResponse{}
-    client.doDelete(url, response)
+    doDelete(url, response)
     if len(response.Errors) > 0 {
         return fmt.Errorf("unable to delete participant: %q", response.Errors[0])
     }
@@ -286,7 +305,7 @@ func (m *Match) ResolveParticipants(t *Tournament) {
     m.Winner = t.GetParticipant(m.WinnerId)
 }
 
-func (c *Client) doGet(url string, v interface{}) {
+func doGet(url string, v interface{}) {
     if debug {
         log.Print("gets resource on url ", url)
     }
@@ -297,7 +316,7 @@ func (c *Client) doGet(url string, v interface{}) {
     handleResponse(resp, v)
 }
 
-func (c *Client) doPost(url string, v interface{}) {
+func doPost(url string, v interface{}) {
     if debug {
         log.Print("posts resource on url ", url)
     }
@@ -308,7 +327,7 @@ func (c *Client) doPost(url string, v interface{}) {
     handleResponse(resp, v)
 }
 
-func (c *Client) doDelete(url string, v interface{}) {
+func doDelete(url string, v interface{}) {
     req, err := http.NewRequest("DELETE", url, nil)
     log.Print("deletes resource on url ", url)
     if err != nil {
