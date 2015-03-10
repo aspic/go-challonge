@@ -13,9 +13,11 @@ import (
 const (
     API_VERSION = "v1"
     tournaments = "tournaments"
-
     STATE_OPEN = "open"
+    STATE_ALL = "all"
 )
+
+var debug = false
 
 var c Client
 
@@ -48,17 +50,11 @@ type Tournament struct {
     client *Client
 }
 
-type ParticipantItem struct {
-    Participant Participant `json:"participant"`
-}
-
 type Participant struct {
     Id int `json:"id"`
     Name string `json:"name"`
-}
-
-type MatchItem struct {
-    Match Match `json:"match"`
+    Wins int
+    Losses int
 }
 
 type Match struct {
@@ -74,12 +70,29 @@ type Match struct {
     Winner *Participant
 }
 
+/** items to flatten json structure */
+type TournamentItem struct {
+    Tournament Tournament `json:"tournament"`
+}
+
+type ParticipantItem struct {
+    Participant Participant `json:"participant"`
+}
+
+type MatchItem struct {
+    Match Match `json:"match"`
+}
+
 func (c *Client) Print() {
     log.Print(c.key)
 }
 
 func New(user string, key string) *Client {
     return &Client{user: user, version: API_VERSION, key: key}
+}
+
+func (c *Client) Debug() {
+    debug = true
 }
 
 func (c *Client) buildUrl(route string, v url.Values) string {
@@ -91,12 +104,21 @@ func (c *Client) buildUrl(route string, v url.Values) string {
     return url
 }
 
+func params(p map[string]string) *url.Values {
+    values := url.Values{}
+    for k,v := range(p) {
+        values.Add(k, v)
+    }
+    return &values
+}
+
 /** creates a new tournament */
 func (c *Client) CreateTournament(name string, subUrl string, open bool, tournamentType string) (*Tournament, error) {
-    v := url.Values{}
-    v.Add("tournament[name]", name)
-    v.Add("tournament[url]", subUrl)
-    v.Add("tournament[open_signup]", "false")
+    v := *params(map[string]string{
+        "tournament[name]": name,
+        "tournament[url]": subUrl,
+        "tournament[open_signup]": "false",
+    })
     // v.Add("tournament[tournament_type]", tournamentType)
     url := c.buildUrl("tournaments", v)
     response := &APIResponse{}
@@ -109,24 +131,50 @@ func (c *Client) CreateTournament(name string, subUrl string, open bool, tournam
 
 /** returns tournament with the specified id */
 func (c *Client) GetTournament(id string) (*Tournament, error) {
-    v := url.Values{}
-    v.Add("include_participants", "1")
-    v.Add("include_matches", "1")
+    v := *params(map[string]string{
+        "include_participants": "1",
+        "include_matches": "1",
+    })
     url := c.buildUrl("tournaments/" + id, v)
     response := &APIResponse{}
     c.doGet(url, response)
-    log.Print("resp ", response)
     if len(response.Errors) > 0 {
         return nil, fmt.Errorf("unable to retrieve tournament: %q", response.Errors[0])
     }
     return response.Tournament.withClient(c), nil
 }
 
+func (c *Client) getTournaments(state string) (*[]Tournament, error) {
+    v := *params(map[string]string{
+        "state": state,
+    })
+    url := c.buildUrl("tournaments", v)
+    items := make([]TournamentItem, 0)
+    c.doGet(url, &items)
+    if len(items) == 0 {
+        return nil, fmt.Errorf("unable to retrieve tournaments")
+    }
+    tours := make([]Tournament, 0)
+    for _, item := range(items) {
+        resolved, err := c.GetTournament(item.Tournament.Name)
+        if err != nil {
+            return nil, fmt.Errorf("unable to resolve tournament: %q", err)
+        }
+        tours = append(tours, *resolved)
+    }
+    return &tours, nil
+}
+
+/** returns all ended tournaments */
+func (c *Client) GetEndedTournaments() (*[]Tournament, error) {
+    return c.getTournaments("ended")
+}
+
 /** adds participant to tournament */
 func (t *Tournament) AddParticipant(name string) (*Participant, error) {
-    v := url.Values{}
-    v.Add("participant[name]", name)
-
+    v := *params(map[string]string{
+        "participant[name]": name,
+    })
     url := t.client.buildUrl("tournaments/" + t.Url + "/participants", v)
     response := &APIResponse{}
     c.doPost(url, response)
@@ -177,17 +225,40 @@ func (t *Tournament) GetParticipant(id int) *Participant {
     return nil
 }
 
+func (t *Tournament) GetParticipants() []Participant {
+    participants := make([]Participant, 0)
+    for _,item := range(t.Participants) {
+        participants = append(participants, item.Participant)
+    }
+    return participants
+}
+
+/** returns all matches for tournament */
+func (t *Tournament) GetMatches() []Match {
+    return t.getMatches(STATE_ALL)
+}
+
 /** returns all open matches */
 func (t *Tournament) GetOpenMatches() []Match {
+    return t.getMatches(STATE_OPEN)
+}
+
+/** resolves and returns matches for tournament */
+func (t *Tournament) getMatches(state string) []Match {
     matches := make([]Match, 0)
+
     for _,item := range t.Matches {
         m := item.Match
-        if m.State == STATE_OPEN {
+        m.ResolveParticipants(t)
+        if state == STATE_ALL {
+            matches = append(matches, m)
+        } else if m.State == state {
             matches = append(matches, m)
         }
     }
     return matches
 }
+
 
 /** returns match with resolved participants */
 func (t *Tournament) GetMatch(id int) *Match {
@@ -207,13 +278,16 @@ func (m *Match) ResolveParticipants(t *Tournament) {
     m.Winner = t.GetParticipant(m.WinnerId)
 }
 
+
 func (t *Tournament) withClient(c *Client) *Tournament {
     t.client = c
     return t
 }
 
 func (c *Client) doGet(url string, v interface{}) {
-    log.Print("gets resource on url ", url)
+    if debug {
+        log.Print("gets resource on url ", url)
+    }
     resp, err := http.Get(url)
     if err != nil {
         log.Fatal("unable to get resource ", err)
@@ -222,7 +296,9 @@ func (c *Client) doGet(url string, v interface{}) {
 }
 
 func (c *Client) doPost(url string, v interface{}) {
-    log.Print("posts resource on url ", url)
+    if debug {
+        log.Print("posts resource on url ", url)
+    }
     resp, err := http.Post(url, "application/json", nil)
     if err != nil {
         log.Fatal("unable to get resource ", err)
@@ -245,8 +321,9 @@ func (c *Client) doDelete(url string, v interface{}) {
 
 func handleResponse(r *http.Response, v interface{}) {
     body, err := ioutil.ReadAll(r.Body)
-
-    // log.Print("got response ", string(body))
+    if debug {
+        log.Print("got response ", string(body))
+    }
 
     if err != nil {
         log.Fatal("unable to read response", err)
