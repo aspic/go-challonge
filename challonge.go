@@ -31,6 +31,7 @@ type Client struct {
 type APIResponse struct {
     Tournament Tournament `json:"tournament"`
     Participant Participant `json:"participant"`
+    Match Match `json:"match"`
 
     Errors []string `json:"errors"`
 }
@@ -202,7 +203,7 @@ func (c *Client) GetEndedTournaments() (*[]Tournament, error) {
     return c.getTournaments("ended")
 }
 
-func (t *Tournament) SubmitMatch(m *Match) error {
+func (t *Tournament) SubmitMatch(m *Match) (*Match, error) {
     v := *params(map[string]string{
         "match[scores_csv]": fmt.Sprintf("%d-%d", m.PlayerOneScore, m.PlayerTwoScore),
         "match[winner_id]": fmt.Sprintf("%d", m.WinnerId),
@@ -210,7 +211,10 @@ func (t *Tournament) SubmitMatch(m *Match) error {
     url := client.buildUrl(fmt.Sprintf("tournaments/%s/matches/%d", t.Url, m.Id), v)
     response := &APIResponse{}
     doPut(url, response)
-    return nil
+    if len(response.Errors) > 0 {
+        return nil, fmt.Errorf("%q", response.Errors[0])
+    }
+    return &response.Match, nil
 }
 
 
