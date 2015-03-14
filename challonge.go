@@ -46,8 +46,8 @@ type Tournament struct {
     ParticipantItems []ParticipantItem `json:"participants"`
     MatchItems []MatchItem `json:"matches"`
 
-    Participants []*Participant
-    Matches []*Match
+    Participants []Participant
+    Matches []Match
 }
 
 type Participant struct {
@@ -237,7 +237,7 @@ func (t *Tournament) AddParticipant(name string, misc string) (*Participant, err
     if len(response.Errors) > 0 {
         return nil, fmt.Errorf("unable to add participant: %q", response.Errors[0])
     }
-    t.Participants = append(t.Participants, &response.Participant)
+    t.Participants = append(t.Participants, response.Participant)
     return &response.Participant, nil
 }
 
@@ -276,8 +276,8 @@ func (t *Tournament) GetParticipantByMisc(misc string) *Participant {
 
 func (t *Tournament) getParticipantByCmp(cmp cmp) *Participant {
     for _,p := range t.Participants {
-        if cmp(*p) {
-            return p
+        if cmp(p) {
+            return &p
         }
     }
     return nil
@@ -300,9 +300,9 @@ func (t *Tournament) getMatches(state string) []Match {
     for _,m := range t.Matches {
         m.ResolveParticipants(t)
         if state == STATE_ALL {
-            matches = append(matches, *m)
+            matches = append(matches, m)
         } else if m.State == state {
-            matches = append(matches, *m)
+            matches = append(matches, m)
         }
     }
     return matches
@@ -314,7 +314,7 @@ func (t *Tournament) GetMatch(id int) *Match {
     for _,match:= range t.Matches {
         if match.Id == id {
             match.ResolveParticipants(t)
-            return match
+            return &match
         }
     }
     return nil
@@ -337,17 +337,20 @@ func (m *Match) ResolveParticipants(t *Tournament) {
 }
 
 func (t *Tournament) resolveRelations() *Tournament {
-    matches := make([]*Match, 0)
+    participants := make([]Participant, 0)
+    for _, item := range(t.ParticipantItems) {
+        participants = append(participants, item.Participant)
+    }
+    t.Participants = participants
+
+    matches := make([]Match, 0)
     for _, item := range(t.MatchItems) {
-        matches = append(matches, &item.Match)
+        match := item.Match
+        match.ResolveParticipants(t)
+        matches = append(matches, match)
     }
     t.Matches = matches
 
-    participants := make([]*Participant, 0)
-    for _, item := range(t.ParticipantItems) {
-        participants = append(participants, &item.Participant)
-    }
-    t.Participants = participants
     return t
 }
 
