@@ -214,6 +214,7 @@ func (t *Tournament) SubmitMatch(m *Match) (*Match, error) {
     if len(response.Errors) > 0 {
         return nil, fmt.Errorf("%q", response.Errors[0])
     }
+    m = &response.Match
     return &response.Match, nil
 }
 
