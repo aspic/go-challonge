@@ -41,10 +41,13 @@ type Tournament struct {
     Id int `json:"id"`
     Url string `json:"url"`
     FullUrl string `json:"full_challonge_url"`
-    Participants []ParticipantItem `json:"participants"`
-    Matches []MatchItem `json:"matches"`
     State string `json:"state"`
     ParticipantsCount int `json:"participants_count"`
+    ParticipantItems []ParticipantItem `json:"participants"`
+    MatchItems []MatchItem `json:"matches"`
+
+    Participants []*Participant
+    Matches []*Match
 }
 
 type Participant struct {
@@ -121,6 +124,10 @@ func (r *APIResponse) hasErrors() bool {
     return len(r.Errors) > 0
 }
 
+func (r *APIResponse) getTournament() *Tournament {
+    return r.Tournament.resolveRelations()
+}
+
 /** creates a new tournament */
 func (c *Client) CreateTournament(name string, subUrl string, open bool, tournamentType string) (*Tournament, error) {
     v := *params(map[string]string{
@@ -135,7 +142,7 @@ func (c *Client) CreateTournament(name string, subUrl string, open bool, tournam
     if response.hasErrors() {
         return nil, fmt.Errorf("unable to create tournament: %q", response.Errors[0])
     }
-    return &response.Tournament, nil
+    return response.getTournament(), nil
 }
 
 func (t *Tournament) Start() error {
@@ -149,7 +156,7 @@ func (t *Tournament) Start() error {
     if response.hasErrors() {
         return fmt.Errorf("error starting tournament:  %q", response.Errors[0])
     }
-    tournament := response.Tournament
+    tournament := response.getTournament()
     if tournament.State == "underway" {
         if debug {
             log.Printf("tournament %q started", tournament.Name)
@@ -157,7 +164,7 @@ func (t *Tournament) Start() error {
     } else {
         return fmt.Errorf("tournament has state %q, probably not started", tournament.State)
     }
-    t = &tournament
+    t = tournament
     return nil
 }
 
@@ -173,8 +180,7 @@ func (c *Client) GetTournament(name string) (*Tournament, error) {
     if len(response.Errors) > 0 {
         return nil, fmt.Errorf("unable to retrieve tournament: %q", response.Errors[0])
     }
-    log.Print(response.Tournament)
-    return &response.Tournament, nil
+    return response.getTournament(), nil
 }
 
 func (c *Client) getTournaments(state string) (*[]Tournament, error) {
@@ -231,7 +237,7 @@ func (t *Tournament) AddParticipant(name string, misc string) (*Participant, err
     if len(response.Errors) > 0 {
         return nil, fmt.Errorf("unable to add participant: %q", response.Errors[0])
     }
-    t.Participants = append(t.Participants, ParticipantItem{response.Participant})
+    t.Participants = append(t.Participants, &response.Participant)
     return &response.Participant, nil
 }
 
@@ -269,21 +275,12 @@ func (t *Tournament) GetParticipantByMisc(misc string) *Participant {
 }
 
 func (t *Tournament) getParticipantByCmp(cmp cmp) *Participant {
-    for _,item := range t.Participants {
-        p := item.Participant
-        if cmp(p) {
-            return &p
+    for _,p := range t.Participants {
+        if cmp(*p) {
+            return p
         }
     }
     return nil
-}
-
-func (t *Tournament) GetParticipants() []Participant {
-    participants := make([]Participant, 0)
-    for _,item := range(t.Participants) {
-        participants = append(participants, item.Participant)
-    }
-    return participants
 }
 
 /** returns all matches for tournament */
@@ -300,13 +297,12 @@ func (t *Tournament) GetOpenMatches() []Match {
 func (t *Tournament) getMatches(state string) []Match {
     matches := make([]Match, 0)
 
-    for _,item := range t.Matches {
-        m := item.Match
+    for _,m := range t.Matches {
         m.ResolveParticipants(t)
         if state == STATE_ALL {
-            matches = append(matches, m)
+            matches = append(matches, *m)
         } else if m.State == state {
-            matches = append(matches, m)
+            matches = append(matches, *m)
         }
     }
     return matches
@@ -315,11 +311,10 @@ func (t *Tournament) getMatches(state string) []Match {
 
 /** returns match with resolved participants */
 func (t *Tournament) GetMatch(id int) *Match {
-    for _,item := range t.Matches {
-        m := item.Match
-        if m.Id == id {
-            m.ResolveParticipants(t)
-            return &m
+    for _,match:= range t.Matches {
+        if match.Id == id {
+            match.ResolveParticipants(t)
+            return match
         }
     }
     return nil
@@ -340,6 +335,22 @@ func (m *Match) ResolveParticipants(t *Tournament) {
     m.PlayerTwo = t.GetParticipant(m.PlayerTwoId)
     m.Winner = t.GetParticipant(m.WinnerId)
 }
+
+func (t *Tournament) resolveRelations() *Tournament {
+    matches := make([]*Match, 0)
+    for _, item := range(t.MatchItems) {
+        matches = append(matches, &item.Match)
+    }
+    t.Matches = matches
+
+    participants := make([]*Participant, 0)
+    for _, item := range(t.ParticipantItems) {
+        participants = append(participants, &item.Participant)
+    }
+    t.Participants = participants
+    return t
+}
+
 
 func doGet(url string, v interface{}) {
     if debug {
