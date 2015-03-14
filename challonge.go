@@ -60,6 +60,9 @@ type Match struct {
     State string `json:"state"`
     PlayerOneId int `json:"player1_id"`
     PlayerTwoId int `json:"player2_id"`
+    PlayerOneScore int
+    PlayerTwoScore int
+
     WinnerId int `json:"winner_id"`
 
     PlayerOne *Participant
@@ -199,6 +202,18 @@ func (c *Client) GetEndedTournaments() (*[]Tournament, error) {
     return c.getTournaments("ended")
 }
 
+func (t *Tournament) SubmitMatch(m *Match) error {
+    v := *params(map[string]string{
+        "match[scores_csv]": fmt.Sprintf("%d-%d", m.PlayerOneScore, m.PlayerTwoScore),
+        "match[winner_id]": fmt.Sprintf("%d", m.WinnerId),
+    })
+    url := client.buildUrl(fmt.Sprintf("tournaments/%s/matches/%d", t.Url, m.Id), v)
+    response := &APIResponse{}
+    doPut(url, response)
+    return nil
+}
+
+
 /** adds participant to tournament */
 func (t *Tournament) AddParticipant(name string, misc string) (*Participant, error) {
     v := *params(map[string]string{
@@ -305,6 +320,16 @@ func (t *Tournament) GetMatch(id int) *Match {
     return nil
 }
 
+func (t *Tournament) GetOpenMatchForParticipant(p *Participant) *Match {
+    matches := t.GetOpenMatches()
+    for _,m := range(matches) {
+        if m.PlayerOneId == p.Id || m.PlayerTwoId == p.Id {
+            return &m
+        }
+    }
+    return nil
+}
+
 func (m *Match) ResolveParticipants(t *Tournament) {
     m.PlayerOne = t.GetParticipant(m.PlayerOneId)
     m.PlayerTwo = t.GetParticipant(m.PlayerTwoId)
@@ -329,6 +354,19 @@ func doPost(url string, v interface{}) {
     resp, err := http.Post(url, "application/json", nil)
     if err != nil {
         log.Fatal("unable to get resource ", err)
+    }
+    handleResponse(resp, v)
+}
+
+func doPut(url string, v interface{}) {
+    req, err := http.NewRequest("PUT", url, nil)
+    log.Print("puts resource on url ", url)
+    if err != nil {
+        log.Fatal("unable to create put request")
+    }
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        log.Fatal("unable to delete", err)
     }
     handleResponse(resp, v)
 }
