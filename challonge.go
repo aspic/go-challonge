@@ -42,6 +42,7 @@ type Tournament struct {
     Url string `json:"url"`
     FullUrl string `json:"full_challonge_url"`
     State string `json:"state"`
+    SubDomain string `json:"subdomain"`
     ParticipantsCount int `json:"participants_count"`
     ParticipantItems []ParticipantItem `json:"participants"`
     MatchItems []MatchItem `json:"matches"`
@@ -150,7 +151,7 @@ func (t *Tournament) Start() error {
         "include_participants": "1",
         "include_matches": "1",
     })
-    url := client.buildUrl("tournaments/" + t.Url + "/start", v)
+    url := client.buildUrl("tournaments/" + t.getUrl() + "/start", v)
     response := &APIResponse{}
     doPost(url, response)
     if response.hasErrors() {
@@ -214,7 +215,7 @@ func (t *Tournament) SubmitMatch(m *Match) (*Match, error) {
         "match[scores_csv]": fmt.Sprintf("%d-%d", m.PlayerOneScore, m.PlayerTwoScore),
         "match[winner_id]": fmt.Sprintf("%d", m.WinnerId),
     })
-    url := client.buildUrl(fmt.Sprintf("tournaments/%s/matches/%d", t.Url, m.Id), v)
+    url := client.buildUrl(fmt.Sprintf("tournaments/%s/matches/%d", t.getUrl(), m.Id), v)
     response := &APIResponse{}
     doPut(url, response)
     if len(response.Errors) > 0 {
@@ -231,7 +232,7 @@ func (t *Tournament) AddParticipant(name string, misc string) (*Participant, err
         "participant[name]": name,
         "participant[misc]": misc,
     })
-    url := client.buildUrl("tournaments/" + t.Url + "/participants", v)
+    url := client.buildUrl("tournaments/" + t.getUrl() + "/participants", v)
     response := &APIResponse{}
     doPost(url, response)
     if len(response.Errors) > 0 {
@@ -239,6 +240,13 @@ func (t *Tournament) AddParticipant(name string, misc string) (*Participant, err
     }
     t.Participants = append(t.Participants, response.Participant)
     return &response.Participant, nil
+}
+
+func (t *Tournament) getUrl() string {
+    if t.SubDomain != "" {
+        return t.SubDomain + "-" + t.Url
+    }
+    return t.Url
 }
 
 /** removes participant from tournament */
@@ -252,7 +260,7 @@ func (t *Tournament) RemoveParticipant(name string) error {
 
 /** removes participant by id */
 func (t *Tournament) RemoveParticipantById(id int) error {
-    url := client.buildUrl("tournaments/" + t.Url + "/participants/" + strconv.Itoa(id), nil)
+    url := client.buildUrl("tournaments/" + t.getUrl() + "/participants/" + strconv.Itoa(id), nil)
     response := &APIResponse{}
     doDelete(url, response)
     if len(response.Errors) > 0 {
