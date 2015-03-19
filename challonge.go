@@ -130,13 +130,18 @@ func (r *APIResponse) getTournament() *Tournament {
 }
 
 /** creates a new tournament */
-func (c *Client) CreateTournament(name string, subUrl string, open bool, tournamentType string) (*Tournament, error) {
+func (c *Client) CreateTournament(name string, subUrl string, domain string, open bool, tType string) (*Tournament, error) {
     v := *params(map[string]string{
         "tournament[name]": name,
         "tournament[url]": subUrl,
         "tournament[open_signup]": "false",
+        "tournament[subdomain]": domain,
     })
-    // v.Add("tournament[tournament_type]", tournamentType)
+    if tType == "" || tType == "single" {
+        v.Add("tournament[tournament_type]", "single elimination")
+    } else if tType == "double" {
+        v.Add("tournament[tournament_type]", "double elimination")
+    }
     url := c.buildUrl("tournaments", v)
     response := &APIResponse{}
     doPost(url, response)
@@ -151,7 +156,7 @@ func (t *Tournament) Start() error {
         "include_participants": "1",
         "include_matches": "1",
     })
-    url := client.buildUrl("tournaments/" + t.getUrl() + "/start", v)
+    url := client.buildUrl("tournaments/" + t.GetUrl() + "/start", v)
     response := &APIResponse{}
     doPost(url, response)
     if response.hasErrors() {
@@ -215,7 +220,7 @@ func (t *Tournament) SubmitMatch(m *Match) (*Match, error) {
         "match[scores_csv]": fmt.Sprintf("%d-%d", m.PlayerOneScore, m.PlayerTwoScore),
         "match[winner_id]": fmt.Sprintf("%d", m.WinnerId),
     })
-    url := client.buildUrl(fmt.Sprintf("tournaments/%s/matches/%d", t.getUrl(), m.Id), v)
+    url := client.buildUrl(fmt.Sprintf("tournaments/%s/matches/%d", t.GetUrl(), m.Id), v)
     response := &APIResponse{}
     doPut(url, response)
     if len(response.Errors) > 0 {
@@ -232,7 +237,7 @@ func (t *Tournament) AddParticipant(name string, misc string) (*Participant, err
         "participant[name]": name,
         "participant[misc]": misc,
     })
-    url := client.buildUrl("tournaments/" + t.getUrl() + "/participants", v)
+    url := client.buildUrl("tournaments/" + t.GetUrl() + "/participants", v)
     response := &APIResponse{}
     doPost(url, response)
     if len(response.Errors) > 0 {
@@ -242,7 +247,8 @@ func (t *Tournament) AddParticipant(name string, misc string) (*Participant, err
     return &response.Participant, nil
 }
 
-func (t *Tournament) getUrl() string {
+/** returns "domain-url" or "url" */
+func (t *Tournament) GetUrl() string {
     if t.SubDomain != "" {
         return t.SubDomain + "-" + t.Url
     }
@@ -260,7 +266,7 @@ func (t *Tournament) RemoveParticipant(name string) error {
 
 /** removes participant by id */
 func (t *Tournament) RemoveParticipantById(id int) error {
-    url := client.buildUrl("tournaments/" + t.getUrl() + "/participants/" + strconv.Itoa(id), nil)
+    url := client.buildUrl("tournaments/" + t.GetUrl() + "/participants/" + strconv.Itoa(id), nil)
     response := &APIResponse{}
     doDelete(url, response)
     if len(response.Errors) > 0 {
