@@ -138,9 +138,9 @@ func (c *Client) CreateTournament(name string, subUrl string, domain string, ope
         "tournament[subdomain]": domain,
     })
     if tType == "" || tType == "single" {
-        v.Add("tournament[tournament_type]", "single elimination")
+        v.Add("tournament[tournament_type]", "single")
     } else if tType == "double" {
-        v.Add("tournament[tournament_type]", "double elimination")
+        v.Add("tournament[tournament_type]", "double")
     }
     url := c.buildUrl("tournaments", v)
     response := &APIResponse{}
