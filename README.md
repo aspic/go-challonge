@@ -29,6 +29,10 @@ Retrieve a tournament, including all matches and participating players:
         log.Fatal("unable to retrieve tournament ", err)
     }
     
+Create a new tournament. Requires name, url, subdomain (can be an empty string), whether to be open or not and tournament type (defaults to single for empty string).
+
+    t, err := client.CreateTournament("name", "url", "subdomain", true, "single")
+    
 ### Matches
 
 Get a list of all open matches:
@@ -38,3 +42,16 @@ Get a list of all open matches:
 Get a specific match:
 
     match := t.GetMatch(id)
+
+### Participants
+
+Add participant to tournament. Misc-field is an API specific field which can be used to identify users.
+
+    p, err := t.AddParticipant("name", "misc")
+    
+Remove a participant
+
+    // by name
+    err := t.RemoveParticipant("name")
+    // by id
+    err := t.RemoveParticipantById(id)
