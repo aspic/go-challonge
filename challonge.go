@@ -46,6 +46,9 @@ type Tournament struct {
     SubDomain string `json:"subdomain"`
     ParticipantsCount int `json:"participants_count"`
     StartedAt time.Time `json:"started_at"`
+    UpdatedAt time.Time `json:"updated_at"`
+
+    SubUrl string `json:"sub_url"`
 
     ParticipantItems []*ParticipantItem `json:"participants"`
     MatchItems []*MatchItem `json:"matches"`
@@ -56,7 +59,7 @@ type Tournament struct {
 
 type Participant struct {
     Id int `json:"id"`
-    Name string `json:"name"`
+    Name string `json:"display_name"`
     Misc string `json:"misc"`
     Wins int
     Losses int
@@ -70,6 +73,7 @@ type Match struct {
     PlayerTwoId int `json:"player2_id"`
     PlayerOneScore int
     PlayerTwoScore int
+    UpdatedAt time.Time `json:"updated_at"`
 
     WinnerId int `json:"winner_id"`
 
@@ -89,6 +93,12 @@ type ParticipantItem struct {
 
 type MatchItem struct {
     Match *Match `json:"match"`
+}
+
+type TournamentRequest struct {
+    client *Client
+    Id string
+    Params map[string]string
 }
 
 func (c *Client) Print() {
@@ -130,6 +140,32 @@ func (r *APIResponse) hasErrors() bool {
 
 func (r *APIResponse) getTournament() *Tournament {
     return r.Tournament.resolveRelations()
+}
+
+func (c *Client) NewTournamentRequest(id string) *TournamentRequest {
+    return &TournamentRequest{client: c, Id: id, Params: make(map[string]string, 0)}
+}
+
+func (r *TournamentRequest) WithParticipants() *TournamentRequest {
+    r.Params["include_participants"] = "1"
+    return r
+}
+
+func (r *TournamentRequest) WithMatches() *TournamentRequest {
+    r.Params["include_matches"] = "1"
+    return r
+}
+
+func (r *TournamentRequest) Get() (*Tournament, error) {
+    url := r.client.buildUrl("tournaments/" + r.Id, *params(r.Params))
+    response := &APIResponse{}
+    doGet(url, response)
+    if len(response.Errors) > 0 {
+        return nil, fmt.Errorf("unable to retrieve tournament: %q", response.Errors[0])
+    }
+    tournament := response.getTournament()
+    tournament.SubUrl = r.Id
+    return tournament, nil
 }
 
 /** creates a new tournament */
@@ -175,47 +211,6 @@ func (t *Tournament) Start() error {
     }
     t = tournament
     return nil
-}
-
-/** returns tournament with the specified id */
-func (c *Client) GetTournament(name string) (*Tournament, error) {
-    v := *params(map[string]string{
-        "include_participants": "1",
-        "include_matches": "1",
-    })
-    url := c.buildUrl("tournaments/" + name, v)
-    response := &APIResponse{}
-    doGet(url, response)
-    if len(response.Errors) > 0 {
-        return nil, fmt.Errorf("unable to retrieve tournament: %q", response.Errors[0])
-    }
-    return response.getTournament(), nil
-}
-
-func (c *Client) getTournaments(state string) (*[]Tournament, error) {
-    v := *params(map[string]string{
-        "state": state,
-    })
-    url := c.buildUrl("tournaments", v)
-    items := make([]TournamentItem, 0)
-    doGet(url, &items)
-    if len(items) == 0 {
-        return nil, fmt.Errorf("unable to retrieve tournaments")
-    }
-    tours := make([]Tournament, 0)
-    for _, item := range(items) {
-        resolved, err := c.GetTournament(item.Tournament.Name)
-        if err != nil {
-            return nil, fmt.Errorf("unable to resolve tournament: %q", err)
-        }
-        tours = append(tours, *resolved)
-    }
-    return &tours, nil
-}
-
-/** returns all ended tournaments */
-func (c *Client) GetEndedTournaments() (*[]Tournament, error) {
-    return c.getTournaments("ended")
 }
 
 func (t *Tournament) SubmitMatch(m *Match) (*Match, error) {
@@ -371,12 +366,27 @@ func (t *Tournament) resolveRelations() *Tournament {
     return t
 }
 
+func DiffMatches(matches1 []*Match, matches2 []*Match) []*Match {
+    diff := make([]*Match, 0)
+
+    for i,_ := range(matches1) {
+        if matches1[i].State != matches2[i].State {
+            diff = append(diff, matches2[i])
+        }
+    }
+
+    return diff
+}
+
 
 func doGet(url string, v interface{}) {
     if debug {
         log.Print("gets resource on url ", url)
     }
     resp, err := http.Get(url)
+    if debug {
+        log.Print("got headers ", resp)
+    }
     if err != nil {
         log.Fatal("unable to get resource ", err)
     }
@@ -422,14 +432,13 @@ func doDelete(url string, v interface{}) {
 
 func handleResponse(r *http.Response, v interface{}) {
     body, err := ioutil.ReadAll(r.Body)
-    if debug {
-        log.Print("got response ", string(body))
-    }
-
     if err != nil {
         log.Fatal("unable to read response", err)
     }
     json.Unmarshal(body, v)
+    if debug {
+        log.Print("unmarshaled to ", v)
+    }
 }
 
 func (t *Tournament) UnmarshalJSON(b []byte) (err error) {
