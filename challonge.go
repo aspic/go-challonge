@@ -80,6 +80,8 @@ type Match struct {
     PlayerOne *Participant
     PlayerTwo *Participant
     Winner *Participant
+
+    Scores string `json:"scores_csv"`
 }
 
 /** items to flatten json structure */
