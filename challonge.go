@@ -8,6 +8,7 @@ import (
     "io/ioutil"
     "net/url"
     "strconv"
+    "time"
 )
 
 const (
@@ -29,8 +30,8 @@ type Client struct {
 }
 
 type APIResponse struct {
-    Tournament Tournament `json:"tournament"`
-    Participant Participant `json:"participant"`
+    Tournament *Tournament `json:"tournament"`
+    Participant *Participant `json:"participant"`
     Match Match `json:"match"`
 
     Errors []string `json:"errors"`
@@ -44,11 +45,13 @@ type Tournament struct {
     State string `json:"state"`
     SubDomain string `json:"subdomain"`
     ParticipantsCount int `json:"participants_count"`
-    ParticipantItems []ParticipantItem `json:"participants"`
-    MatchItems []MatchItem `json:"matches"`
+    StartedAt time.Time `json:"started_at"`
 
-    Participants []Participant
-    Matches []Match
+    ParticipantItems []*ParticipantItem `json:"participants"`
+    MatchItems []*MatchItem `json:"matches"`
+
+    Participants []*Participant
+    Matches []*Match
 }
 
 type Participant struct {
@@ -85,7 +88,7 @@ type ParticipantItem struct {
 }
 
 type MatchItem struct {
-    Match Match `json:"match"`
+    Match *Match `json:"match"`
 }
 
 func (c *Client) Print() {
@@ -244,7 +247,7 @@ func (t *Tournament) AddParticipant(name string, misc string) (*Participant, err
         return nil, fmt.Errorf("unable to add participant: %q", response.Errors[0])
     }
     t.Participants = append(t.Participants, response.Participant)
-    return &response.Participant, nil
+    return response.Participant, nil
 }
 
 /** returns "domain-url" or "url" */
@@ -276,40 +279,40 @@ func (t *Tournament) RemoveParticipantById(id int) error {
 }
 
 /** returns a participant id based on name */
-type cmp func(Participant) bool
+type cmp func(*Participant) bool
 
 func (t *Tournament) GetParticipant(id int) *Participant {
-    return t.getParticipantByCmp(func(p Participant) bool { return p.Id == id})
+    return t.getParticipantByCmp(func(p *Participant) bool { return p.Id == id})
 }
 func (t *Tournament) GetParticipantByName(name string) *Participant {
-    return t.getParticipantByCmp(func(p Participant) bool { return p.Name == name })
+    return t.getParticipantByCmp(func(p *Participant) bool { return p.Name == name })
 }
 func (t *Tournament) GetParticipantByMisc(misc string) *Participant {
-    return t.getParticipantByCmp(func(p Participant) bool { return p.Misc == misc})
+    return t.getParticipantByCmp(func(p *Participant) bool { return p.Misc == misc})
 }
 
 func (t *Tournament) getParticipantByCmp(cmp cmp) *Participant {
     for _,p := range t.Participants {
         if cmp(p) {
-            return &p
+            return p
         }
     }
     return nil
 }
 
 /** returns all matches for tournament */
-func (t *Tournament) GetMatches() []Match {
+func (t *Tournament) GetMatches() []*Match {
     return t.getMatches(STATE_ALL)
 }
 
 /** returns all open matches */
-func (t *Tournament) GetOpenMatches() []Match {
+func (t *Tournament) GetOpenMatches() []*Match {
     return t.getMatches(STATE_OPEN)
 }
 
 /** resolves and returns matches for tournament */
-func (t *Tournament) getMatches(state string) []Match {
-    matches := make([]Match, 0)
+func (t *Tournament) getMatches(state string) []*Match {
+    matches := make([]*Match, 0)
 
     for _,m := range t.Matches {
         m.ResolveParticipants(t)
@@ -328,7 +331,7 @@ func (t *Tournament) GetMatch(id int) *Match {
     for _,match:= range t.Matches {
         if match.Id == id {
             match.ResolveParticipants(t)
-            return &match
+            return match
         }
     }
     return nil
@@ -338,7 +341,7 @@ func (t *Tournament) GetOpenMatchForParticipant(p *Participant) *Match {
     matches := t.GetOpenMatches()
     for _,m := range(matches) {
         if m.PlayerOneId == p.Id || m.PlayerTwoId == p.Id {
-            return &m
+            return m
         }
     }
     return nil
@@ -351,13 +354,13 @@ func (m *Match) ResolveParticipants(t *Tournament) {
 }
 
 func (t *Tournament) resolveRelations() *Tournament {
-    participants := make([]Participant, 0)
+    participants := make([]*Participant, 0)
     for _, item := range(t.ParticipantItems) {
-        participants = append(participants, item.Participant)
+        participants = append(participants, &item.Participant)
     }
     t.Participants = participants
 
-    matches := make([]Match, 0)
+    matches := make([]*Match, 0)
     for _, item := range(t.MatchItems) {
         match := item.Match
         match.ResolveParticipants(t)
