@@ -47,6 +47,8 @@ type Tournament struct {
     ParticipantsCount int `json:"participants_count"`
     StartedAt time.Time `json:"started_at"`
     UpdatedAt time.Time `json:"updated_at"`
+    Type string `json:"tournament_type"`
+    Description string `json:"description"`
 
     SubUrl string `json:"sub_url"`
 
