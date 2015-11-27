@@ -45,19 +45,20 @@ type Tournament struct {
     State string `json:"state"`
     SubDomain string `json:"subdomain"`
     ParticipantsCount int `json:"participants_count"`
-    StartedAt time.Time `json:"started_at"`
-    UpdatedAt time.Time `json:"updated_at"`
+    StartedAt *time.Time `json:"started_at,mitempty"`
+    UpdatedAt *time.Time `json:"updated_at,omitempty"`
     Type string `json:"tournament_type"`
     Description string `json:"description"`
     GameName string `json:"game_name"`
+    Progress int `json:"progress_meter"`
 
     SubUrl string `json:"sub_url"`
 
-    ParticipantItems []*ParticipantItem `json:"participants"`
-    MatchItems []*MatchItem `json:"matches"`
+    ParticipantItems []*ParticipantItem `json:"participants,omitempty"`
+    MatchItems []*MatchItem `json:"matches,omitempty"`
 
-    Participants []*Participant
-    Matches []*Match
+    Participants []*Participant `json:"resolved_participants"`
+    Matches []*Match `json:"resolved_matches"`
 }
 
 type Participant struct {
@@ -77,7 +78,7 @@ type Match struct {
     PlayerTwoId int `json:"player2_id"`
     PlayerOneScore int
     PlayerTwoScore int
-    UpdatedAt time.Time `json:"updated_at"`
+    UpdatedAt *time.Time `json:"updated_at,omitempty"`
 
     WinnerId int `json:"winner_id"`
 
@@ -326,7 +327,6 @@ func (t *Tournament) getMatches(state string) []*Match {
     return matches
 }
 
-
 /** returns match with resolved participants */
 func (t *Tournament) GetMatch(id int) *Match {
     for _,match:= range t.Matches {
@@ -336,6 +336,10 @@ func (t *Tournament) GetMatch(id int) *Match {
         }
     }
     return nil
+}
+
+func (t *Tournament) IsCompleted() bool {
+    return t.State == "complete" || t.State == "awaiting_review";
 }
 
 func (t *Tournament) GetOpenMatchForParticipant(p *Participant) *Match {
@@ -360,6 +364,7 @@ func (t *Tournament) resolveRelations() *Tournament {
         participants = append(participants, &item.Participant)
     }
     t.Participants = participants
+    t.ParticipantItems = nil
 
     matches := make([]*Match, 0)
     for _, item := range(t.MatchItems) {
@@ -368,6 +373,7 @@ func (t *Tournament) resolveRelations() *Tournament {
         matches = append(matches, match)
     }
     t.Matches = matches
+    t.MatchItems = nil
 
     return t
 }
@@ -376,6 +382,9 @@ func DiffMatches(matches1 []*Match, matches2 []*Match) []*Match {
     diff := make([]*Match, 0)
 
     for i,_ := range(matches1) {
+        if i >= len(matches2) {
+            break;
+        }
         if matches1[i].State != matches2[i].State {
             diff = append(diff, matches2[i])
         }
@@ -441,7 +450,10 @@ func handleResponse(r *http.Response, v interface{}) {
     if err != nil {
         log.Fatal("unable to read response", err)
     }
-    json.Unmarshal(body, v)
+    err = json.Unmarshal(body, v)
+    if err != nil {
+        log.Print("Error unmarshaling json ", err)
+    }
     if debug {
         log.Print("unmarshaled to ", v)
     }
