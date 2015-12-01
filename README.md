@@ -37,7 +37,7 @@ Create a new tournament. Requires name, url, subdomain (can be an empty string),
 
 Get a list of all open matches:
 
-    matches := t.GetOpenMatches()
+    matches := t.GetOpenMatches()
     
 Get a specific match:
 
