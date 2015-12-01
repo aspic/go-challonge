@@ -20,14 +20,25 @@ Golang API client for retrieving (and potentially updating) tournaments in  [Cha
 
 ### Tournaments
 
-Retrieve a tournament, including all matches and participating players:
+Retrieve tournament
 
-    t, err := client.GetTournament("tournament-name")
+    t, err := client.NewTournamentRequest("tournament").Get()
     
     if err != nil {
         // invalid tournament name, unable to reach host etc.
         log.Fatal("unable to retrieve tournament ", err)
     }
+    
+Retrieve tournament with matches and participants
+
+    t, err := client.NewTournamentRequest("tournament").
+            WithMatches().
+            WithParticipants().
+            Get()
+            
+To re-fetch a tournament
+
+    newTournament, err := oldTournament.Update().Get()
     
 Create a new tournament. Requires name, url, subdomain (can be an empty string), whether to be open or not and tournament type (defaults to single for empty string).
 
@@ -37,7 +48,7 @@ Create a new tournament. Requires name, url, subdomain (can be an empty string),
 
 Get a list of all open matches:
 
-    matches := t.GetOpenMatches()
+    matches := t.GetOpenMatches()
     
 Get a specific match:
 
