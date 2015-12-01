@@ -163,6 +163,10 @@ func (r *TournamentRequest) WithMatches() *TournamentRequest {
     return r
 }
 
+func (t *Tournament) Update() *TournamentRequest {
+    return client.NewTournamentRequest(t.SubUrl)
+}
+
 func (r *TournamentRequest) Get() (*Tournament, error) {
     url := r.client.buildUrl("tournaments/" + r.Id, *params(r.Params))
     response := &APIResponse{}
@@ -174,6 +178,7 @@ func (r *TournamentRequest) Get() (*Tournament, error) {
     tournament.SubUrl = r.Id
     return tournament, nil
 }
+
 
 /** creates a new tournament */
 func (c *Client) CreateTournament(name string, subUrl string, domain string, open bool, tType string) (*Tournament, error) {
