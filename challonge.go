@@ -68,6 +68,7 @@ type Participant struct {
     Seed int `json:"seed"`
     Wins int
     Losses int
+    TotalScore int
 }
 
 type Match struct {
@@ -357,10 +358,28 @@ func (t *Tournament) GetOpenMatchForParticipant(p *Participant) *Match {
     return nil
 }
 
+func (p *Participant) Lose() {
+    p.Losses += 1
+}
+
+func (p *Participant) Win() {
+    p.Wins += 1
+}
+
 func (m *Match) ResolveParticipants(t *Tournament) {
     m.PlayerOne = t.GetParticipant(m.PlayerOneId)
     m.PlayerTwo = t.GetParticipant(m.PlayerTwoId)
-    m.Winner = t.GetParticipant(m.WinnerId)
+
+    if m.WinnerId == m.PlayerOneId {
+        m.PlayerOne.Win()
+        m.PlayerTwo.Lose()
+    } else if m.WinnerId == m.PlayerTwoId {
+        m.PlayerTwo.Win()
+        m.PlayerOne.Lose()
+    }
+    m.PlayerOne.TotalScore += m.PlayerOneScore
+    m.PlayerTwo.TotalScore += m.PlayerTwoScore
+
 }
 
 func (t *Tournament) resolveRelations() *Tournament {
